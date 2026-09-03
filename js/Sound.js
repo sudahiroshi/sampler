@@ -150,8 +150,9 @@ export class Sound {
 
   /** 未読み込みなら読み込んでから再生する。既に鳴っていれば鳴らし直す */
   async play() {
-    await this.load();
+    // 読み込みより先に unlock する。iOS はユーザー操作から離れるほど解除に失敗しやすい
     await this.#engine.unlock();
+    await this.load();
 
     this.stop();
 
