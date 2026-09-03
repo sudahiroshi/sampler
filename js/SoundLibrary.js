@@ -12,6 +12,7 @@ export class SoundLibrary {
   #manifestUrl;
   #fetch;
   #log;
+  #soundClass;
   #sounds = new Map();
 
   /**
@@ -22,6 +23,9 @@ export class SoundLibrary {
    *   音量の保存先。null なら manifest の defaultVolume をそのまま使う
    * @param {typeof fetch} [options.fetchImpl]
    * @param {import('./DebugLog.js').DebugLog} [options.log] 診断ログ
+   * @param {typeof Sound} [options.soundClass]
+   *   音源 1 つ分を担うクラス。既定は Web Audio 経路の Sound。
+   *   MediaSound を渡すと HTMLAudioElement 経路になる（UI 側の分岐は不要）
    */
   constructor({
     engine,
@@ -29,12 +33,14 @@ export class SoundLibrary {
     settings = null,
     fetchImpl,
     log = null,
+    soundClass = Sound,
   } = {}) {
     this.#engine = engine;
     this.#settings = settings;
     this.#manifestUrl = manifestUrl;
     this.#fetch = fetchImpl ?? ((...args) => globalThis.fetch(...args));
     this.#log = log;
+    this.#soundClass = soundClass;
   }
 
   /** manifest を取得して Sound を組み立てる */
@@ -66,7 +72,7 @@ export class SoundLibrary {
         : defaultVolume;
       this.#sounds.set(
         entry.id,
-        new Sound(entry, {
+        new this.#soundClass(entry, {
           engine: this.#engine,
           baseUrl,
           volume,

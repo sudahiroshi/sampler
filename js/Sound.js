@@ -6,7 +6,7 @@
  * 2 回目以降の再生ではネットワークアクセスもデコードも発生しない。
  */
 
-import { readWavInfo } from './wavInfo.js';
+import { checkDuration, fetchAudioData } from './fetchAudio.js';
 
 /** 音源の状態。UI はこれを見て表示を切り替える */
 export const SoundState = Object.freeze({
@@ -19,9 +19,6 @@ export const SoundState = Object.freeze({
 
 /** 停止時のフェードアウト長（秒）。急に切るとプチノイズが出る */
 const STOP_FADE_SEC = 0.02;
-
-/** ヘッダから計算した秒数とデコード後の秒数の許容差（秒） */
-const DURATION_TOLERANCE_SEC = 0.05;
 
 /** 再生が早く終わったと判断する差（秒）。これ以上早いと中断を疑う */
 const EARLY_END_TOLERANCE_SEC = 0.15;
@@ -141,48 +138,13 @@ export class Sound {
 
     this.#setState(SoundState.LOADING);
     const promise = (async () => {
-      this.#log?.log('fetch', `${this.id} 取得開始 ${this.#url}`);
       const startedAt = Date.now();
-      const response = await this.#fetch(this.#url);
-      const declaredLength = Number(response.headers?.get?.('content-length') ?? NaN);
-      this.#log?.log(
-        'fetch',
-        `${this.id} 応答 status=${response.status} content-length=${
-          Number.isFinite(declaredLength) ? declaredLength : '(なし)'
-        } ${Date.now() - startedAt}ms`,
-      );
-      if (!response.ok) {
-        throw new Error(`音源を取得できませんでした (HTTP ${response.status})`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      this.#log?.log(
-        'fetch',
-        `${this.id} 本文を受信 ${arrayBuffer.byteLength}B (${Date.now() - startedAt}ms)`,
-      );
-      if (Number.isFinite(declaredLength) && declaredLength !== arrayBuffer.byteLength) {
-        this.#log?.warn(
-          `${this.id} 受信バイト数が Content-Length と違う: 期待 ${declaredLength}B / 実際 ${arrayBuffer.byteLength}B`,
-        );
-      }
-
-      // decodeAudioData は ArrayBuffer を detach するので、必ずデコードより前に読む
-      const wav = readWavInfo(arrayBuffer);
-      if (wav) {
-        this.#log?.log(
-          'fetch',
-          `${this.id} WAV ヘッダ ${wav.sampleRate}Hz ${wav.bitsPerSample}bit ch=${wav.channels} ` +
-            `data=${wav.availableDataBytes}/${wav.declaredDataBytes}B ` +
-            `想定 ${wav.declaredDuration.toFixed(3)}s`,
-        );
-        if (wav.truncated) {
-          this.#log?.warn(
-            `${this.id} ファイルが途中で切れている: ヘッダは ${wav.declaredFileBytes}B ` +
-              `${wav.declaredDuration.toFixed(3)}s のはずが ${wav.receivedBytes}B ` +
-              `${wav.availableDuration.toFixed(3)}s しか届いていない`,
-          );
-        }
-      }
+      const { arrayBuffer, wav } = await fetchAudioData({
+        id: this.id,
+        url: this.#url,
+        fetchImpl: this.#fetch,
+        log: this.#log,
+      });
 
       const audioBuffer = await this.#engine.decode(arrayBuffer);
       this.#log?.log(
@@ -190,15 +152,7 @@ export class Sound {
         `${this.id} デコード完了 ${audioBuffer.duration?.toFixed?.(3) ?? '?'}s ` +
           `${audioBuffer.sampleRate ?? '?'}Hz (${Date.now() - startedAt}ms)`,
       );
-      if (wav && typeof audioBuffer.duration === 'number') {
-        const gap = Math.abs(audioBuffer.duration - wav.declaredDuration);
-        if (gap > DURATION_TOLERANCE_SEC) {
-          this.#log?.warn(
-            `${this.id} デコード後の秒数がヘッダと違う: 想定 ${wav.declaredDuration.toFixed(3)}s / ` +
-              `実際 ${audioBuffer.duration.toFixed(3)}s (差 ${gap.toFixed(3)}s)`,
-          );
-        }
-      }
+      checkDuration({ id: this.id, wav, duration: audioBuffer.duration, log: this.#log });
 
       this.#buffer = audioBuffer;
       return audioBuffer;

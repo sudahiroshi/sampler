@@ -102,7 +102,7 @@ test('デコード後の秒数がヘッダと違うと警告が出る', async ()
 
   const warnings = log.warnings();
   assert.equal(warnings.length, 1);
-  assert.match(warnings[0], /デコード後の秒数がヘッダと違う/);
+  assert.match(warnings[0], /実際の秒数がヘッダと違う/);
   assert.match(warnings[0], /想定 2\.600s/);
   assert.match(warnings[0], /実際 0\.400s/);
 });

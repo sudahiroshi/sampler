@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { AudioEngine } from '../js/AudioEngine.js';
+import { MediaSound } from '../js/MediaSound.js';
 import { Sound } from '../js/Sound.js';
 import { SoundLibrary } from '../js/SoundLibrary.js';
 import { SettingsStore } from '../js/SettingsStore.js';
@@ -319,4 +320,60 @@ test('全停止のあとも同じタイルをタップすれば鳴る', async ()
   } finally {
     restore();
   }
+});
+
+// ---------------------------------------------------------------------------
+// 再生経路の差し替え（?engine=audio の土台）
+// ---------------------------------------------------------------------------
+
+test('MediaSound は Sound と同じインターフェースを持つ（UI を触らず差し替えられる）', () => {
+  const publicNames = (klass) =>
+    Object.getOwnPropertyNames(klass.prototype)
+      .filter((name) => name !== 'constructor')
+      .sort();
+
+  const missing = publicNames(Sound).filter((name) => !publicNames(MediaSound).includes(name));
+  assert.deepEqual(missing, [], `MediaSound に足りないもの: ${missing.join(', ')}`);
+});
+
+test('SoundLibrary は soundClass で音源クラスを差し替えられる', async () => {
+  const created = [];
+  class FakeSound {
+    constructor(definition, options) {
+      created.push({ definition, options });
+      this.id = definition.id;
+      this.volume = options.volume;
+    }
+    setVolume(value) {
+      this.volume = value;
+      return value;
+    }
+    stop() {}
+  }
+
+  const library = new SoundLibrary({
+    engine: null,
+    manifestUrl: MANIFEST_URL,
+    fetchImpl: createMockFetch(manifestRoutes()),
+    soundClass: FakeSound,
+  });
+  await library.loadManifest();
+
+  assert.equal(library.size, 4);
+  assert.equal(created.length, 4);
+  assert.ok(library.get('fanfare') instanceof FakeSound);
+  assert.equal(created[0].options.baseUrl, 'sounds/');
+  assert.equal(created[0].options.volume, 0.8);
+});
+
+test('soundClass を省略すると Web Audio 経路の Sound になる', async () => {
+  await withFakeAudio({}, async () => {
+    const library = new SoundLibrary({
+      engine: new AudioEngine(),
+      manifestUrl: MANIFEST_URL,
+      fetchImpl: createMockFetch(manifestRoutes()),
+    });
+    await library.loadManifest();
+    assert.ok(library.get('fanfare') instanceof Sound);
+  });
 });

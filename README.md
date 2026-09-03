@@ -109,6 +109,9 @@ node --test 'tests/*.test.mjs'
 | `js/SoundLibrary.js` | `manifest.json` から `Sound` の集合を組み立て、プリロードと全停止をまとめる |
 | `js/SettingsStore.js` | `localStorage` への永続化。使えない環境ではメモリへ自動フォールバックする |
 | `js/ThemeController.js` | 選択値と OS 設定から適用テーマを決め、`data-theme` を付ける。保存は `SettingsStore` に委譲 |
+| `js/MediaSound.js` | `Sound` と同じインターフェースで、`HTMLAudioElement`（Blob URL）で鳴らす切り分け用の経路 |
+| `js/fetchAudio.js` | 音源の取得と診断ログへの記録。両方の再生経路で共通 |
+| `js/wavInfo.js` | WAV ヘッダの読み取り（受信バイト数・秒数の突き合わせに使う） |
 | `js/DebugLog.js` | `?debug=1` のときだけ画面に診断ログを出す。通常表示では何も描画しない |
 | `js/SamplerUI.js` | タイルの描画とイベント処理。再生ロジックは持たない |
 | `js/main.js` | 上記を組み立てる配線だけ |
@@ -172,6 +175,32 @@ http://<サーバの IP>:8000/?debug=1
 
 「音が途中で切れる」ときは `context` 行で state が `interrupted` や `suspended` に落ちていないか、
 「タップしたのに鳴らない」ときは `event` 行が 1 タップで 2 回出ていないかを見てください。
+
+食い違いを見つけると `warn` 行（⚠ 付き・赤字）が出ます。判定できるのは次の 4 つです。
+
+| 警告 | 意味 |
+| --- | --- |
+| 受信バイト数が Content-Length と違う | 応答が途中で終わっている（サーバまたは回線の問題） |
+| ファイルが途中で切れている | WAV ヘッダの宣言より実データが少ない。何秒ぶんしか届いていないかも出る |
+| 実際の秒数がヘッダと違う | デコード（または `<audio>`）で得られた長さがファイルの宣言と合わない |
+| 再生が早く終わった | `onended` が音源の長さより 0.15 秒以上早く来た。再生の中断を疑う |
+
+「ログをコピー」ボタンでヘッダ（再生経路・UA）付きのテキストがまとめて取れます。
+クリップボードが使えない環境では下に textarea が出て全選択されるので、長押しでコピーしてください。
+
+### 再生経路の切り分け（`?engine=audio`）
+
+Web Audio 固有の問題かどうかを分けるため、再生経路を明示的に切り替えられます。
+
+| URL | 経路 |
+| --- | --- |
+| （既定）または `?engine=webaudio` | Web Audio API（`AudioContext` + `decodeAudioData`） |
+| `?engine=audio` | `HTMLAudioElement`（取得したバイト列を Blob URL にして再生） |
+
+`?engine=audio` では `AudioContext` を一切生成しません。音量・停止・再生中表示は同じように動きます
+（ただし iOS では `HTMLMediaElement.volume` が無視され、本体の音量が優先されます）。
+**自動フォールバックはしません。** クエリで指定したときだけ切り替わり、
+どちらで動いているかは診断パネルの先頭に出ます。
 
 ## ディレクトリ構成
 
