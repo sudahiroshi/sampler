@@ -12,21 +12,33 @@ HTML / Vanilla JS / CSS だけで書かれており、フレームワークも�
 
 ## 起動方法
 
-静的ファイルを配信するだけです。`file://` で開くと ES Modules と `fetch` が使えないため、必ず HTTP で配信してください。
+同梱の静的サーバを使います（Node.js 標準モジュールのみ、追加インストール不要）。
+`file://` で開くと ES Modules と `fetch` が使えないため、必ず HTTP で配信してください。
 
 ```sh
 cd path/to/sampler
-python3 -m http.server 8123
+node tools/serve.mjs                      # 既定: http://0.0.0.0:8000/
+node tools/serve.mjs --port 8123          # ポートを変える
+node tools/serve.mjs --host 127.0.0.1     # ローカルからのみに限定する
 ```
 
-ブラウザで <http://localhost:8123/> を開きます。
-同じ Wi-Fi 上の iPhone / iPad から使う場合は、PC の LAN IP を指定してアクセスします（例: `http://192.168.1.10:8123/`）。
+ブラウザで <http://localhost:8000/> を開きます。
+同じ Wi-Fi 上の iPhone / iPad から使う場合は、PC の LAN IP を指定してアクセスします（例: `http://192.168.1.10:8000/`）。
+既定の `--host 0.0.0.0` で LAN に公開されます。
 
-Node.js がある場合は次でも構いません。
+リクエストのメソッド・パス・ステータス・送信バイト数・所要時間が標準出力に出るので、
+実機からどこまで取得できているかを確認できます。接続が途中で切れた場合もログに出ます。
 
-```sh
-npx http-server -p 8123
-```
+### `python3 -m http.server` は使わないでください
+
+シングルスレッドのため同時リクエストを捌けず、**接続を落とします**。実測値:
+
+| サーバ | 並列 8 本 | 並列 24 本 |
+| --- | --- | --- |
+| `node tools/serve.mjs` | 成功 8/8（9ms） | 成功 24/24（13ms） |
+| `python3 -m http.server` | 成功 5/8（3 本が ECONNRESET） | 成功 9/24（15 本が ECONNRESET） |
+
+音源の取得が途中で終わったり返らなくなる原因になります。
 
 ## 使い方
 
@@ -82,6 +94,9 @@ node tests/verify-wav.mjs   # ヘッダ・長さ・振幅（無音でない/ク�
 node tests/contrast.mjs     # 両テーマのコントラスト比を WCAG の式で実測
 node --test 'tests/*.test.mjs'
 ```
+
+`tests/serve.test.mjs` には配信サーバのテスト（MIME / Content-Length / Range / 並列 8 本 /
+ディレクトリトラバーサル）が入っています。
 
 ## クラス構成
 
@@ -143,7 +158,7 @@ html[data-theme='dark']         { --bg: …; color-scheme: dark; }
 iOS Safari は手元でコンソールが見られないため、URL に `?debug=1` を付けると画面下に診断ログが出ます。
 
 ```
-http://<サーバの IP>:8123/?debug=1
+http://<サーバの IP>:8000/?debug=1
 ```
 
 記録されるのは次の 4 種です。通常の URL では何も表示されず、ログも記録しません。
@@ -168,6 +183,8 @@ http://<サーバの IP>:8123/?debug=1
 ├── sounds/
 │   ├── manifest.json          音源の定義。ここに追記するだけで音源が増える
 │   └── *.wav                  生成済みの音源
-├── tools/generate-sounds.mjs  音源を合成生成するスクリプト
+├── tools/
+│   ├── generate-sounds.mjs    音源を合成生成するスクリプト
+│   └── serve.mjs              開発用の静的サーバ（同時接続を捌ける）
 └── tests/                     Node.js で動くテスト
 ```
