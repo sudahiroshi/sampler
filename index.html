@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover でノッチ端末のセーフエリアを扱えるようにする -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="ブラウザで効果音を鳴らすサンプラー" />
+    <title>効果音サンプラー</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app__header">
+        <h1 class="app__title">効果音サンプラー</h1>
+        <div class="app__controls">
+          <div class="switch">
+            <input type="checkbox" id="preload-toggle" />
+            <label class="switch__label" for="preload-toggle">起動時に全部読み込む</label>
+          </div>
+          <button type="button" id="stop-all" class="stop-all">■ 全停止</button>
+        </div>
+      </header>
+
+      <p class="status" id="status" role="status" aria-live="polite">読み込み中…</p>
+
+      <main class="grid" id="grid"></main>
+
+      <footer class="app__footer">
+        タイルをタップすると再生、再生中にもう一度タップすると停止します。
+      </footer>
+    </div>
+
+    <!-- iOS でオーディオセッションを起こすための無音。UI には表示しない -->
+    <audio id="silent-keepalive" src="sounds/silence.wav" preload="none" playsinline hidden></audio>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>

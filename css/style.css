@@ -1,0 +1,252 @@
+/* 効果音サンプラーのスタイル。外部フォント・外部CSSには依存しない */
+
+:root {
+  --bg: #14161c;
+  --panel: #1e2129;
+  --panel-active: #272b35;
+  --border: #313743;
+  --text: #f2f4f8;
+  --muted: #99a2b2;
+  --accent: #4c8dff;
+  --playing: #37c26d;
+  --error: #ff7070;
+  --radius: 16px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* ダブルタップズームと 300ms のタップ遅延を抑止する */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic',
+    'Noto Sans JP', sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app {
+  /* dvh でアドレスバーの伸縮に追従させる（未対応ブラウザは vh にフォールバック） */
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right))
+    calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+}
+
+.app__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.app__title {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+}
+
+.app__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app__footer {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: center;
+  padding-top: 4px;
+}
+
+/* --- ヘッダのコントロール --- */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.switch__label {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.switch input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.stop-all {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.stop-all:active {
+  background: var(--panel-active);
+}
+
+.status {
+  margin: 0;
+  min-height: 1.2em;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.status--error {
+  color: var(--error);
+}
+
+/* --- タイル --- */
+
+.grid {
+  flex: 1;
+  display: grid;
+  /* 狭幅では 2 列、広幅では音源数ぶん自動的に並ぶ */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-content: start;
+  gap: 12px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.tile__pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 130px;
+  padding: 12px 8px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: transform 0.06s ease, background-color 0.12s ease;
+}
+
+.tile__pad:active {
+  background: var(--panel-active);
+  transform: scale(0.97);
+}
+
+.tile__icon {
+  font-size: clamp(2.2rem, 9vw, 3.2rem);
+  line-height: 1;
+}
+
+.tile__name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.tile__state {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.tile.is-playing {
+  border-color: var(--playing);
+  box-shadow: 0 0 0 1px var(--playing);
+}
+
+.tile.is-playing .tile__pad {
+  background: rgba(55, 194, 109, 0.16);
+}
+
+.tile.is-playing .tile__state {
+  color: var(--playing);
+}
+
+.tile.is-loading .tile__state {
+  color: var(--accent);
+}
+
+.tile.is-error {
+  border-color: var(--error);
+}
+
+.tile.is-error .tile__state {
+  color: var(--error);
+}
+
+/* --- 音量スライダー --- */
+
+.tile__volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tile__slider {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  accent-color: var(--accent);
+}
+
+.tile__volume-value {
+  min-width: 3.2em;
+  text-align: right;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+@media (max-width: 380px) {
+  .app__title {
+    font-size: 1rem;
+  }
+
+  .tile__pad {
+    min-height: 112px;
+  }
+}
