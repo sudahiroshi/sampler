@@ -316,9 +316,20 @@ body {
 }
 
 .debug-log__title {
+  min-height: 44px;
   margin: 0;
-  font-size: 0.85rem;
+  padding: 0 8px 0 0;
+  border: none;
+  background: transparent;
   color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .debug-log__copy {
@@ -337,6 +348,20 @@ body {
 .debug-log__status {
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+.debug-log__hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+/* 折りたたみ時は見出しだけ残す */
+.debug-log.is-collapsed .debug-log__body {
+  display: none;
+}
+
+.debug-log.is-collapsed .debug-log__header {
+  margin-bottom: 0;
 }
 
 .debug-log__headline {
@@ -420,5 +445,12 @@ body {
 
   .tile__pad {
     min-height: 112px;
+  }
+}
+
+/* 診断ログを既定で出しているので、狭い画面では高さを抑えてタイルの邪魔をしない */
+@media (max-width: 560px) {
+  .debug-log__list {
+    max-height: 30vh;
   }
 }

@@ -190,12 +190,41 @@ test('最後まで鳴った場合は警告を出さない', async () => {
 // DebugLog 本体
 // ---------------------------------------------------------------------------
 
-test('?debug=1 のときだけ有効になる', () => {
-  assert.equal(DebugLog.isEnabled('?debug=1'), true);
+test('いまは既定で有効（クエリなしでも表示する）', () => {
+  assert.equal(DebugLog.enabledByDefault, true);
+  assert.equal(DebugLog.isEnabled(''), true);
+  assert.equal(DebugLog.isEnabled('?engine=audio'), true);
+  assert.equal(DebugLog.isEnabled('?other=1'), true);
+});
+
+test('?debug=0 系で明示的に無効化できる', () => {
+  for (const search of ['?debug=0', '?debug=off', '?debug=false', '?debug=no', '?debug=OFF']) {
+    assert.equal(DebugLog.isEnabled(search), false, search);
+  }
+  assert.equal(DebugLog.isEnabled('?engine=audio&debug=0'), false);
+});
+
+test('?debug=1 系の従来の指定も引き続き有効', () => {
+  for (const search of ['?debug=1', '?debug=on', '?debug=true', '?debug=yes']) {
+    assert.equal(DebugLog.isEnabled(search), true, search);
+  }
   assert.equal(DebugLog.isEnabled('?debug=1&engine=audio'), true);
-  assert.equal(DebugLog.isEnabled(''), false);
-  assert.equal(DebugLog.isEnabled('?debug=0'), false);
-  assert.equal(DebugLog.isEnabled('?other=1'), false);
+});
+
+test('知らない値や壊れたクエリは既定に従う', () => {
+  assert.equal(DebugLog.isEnabled('?debug=maybe'), DebugLog.enabledByDefault);
+  assert.equal(DebugLog.isEnabled('?debug='), DebugLog.enabledByDefault);
+  assert.equal(DebugLog.isEnabled('%'), DebugLog.enabledByDefault);
+});
+
+test('折りたたみ状態を切り替えられる（DOM が無くても落ちない）', () => {
+  const log = new DebugLog({ enabled: true });
+  assert.equal(log.collapsed, false);
+  assert.equal(log.toggleCollapsed(), true);
+  assert.equal(log.collapsed, true);
+  assert.equal(log.toggleCollapsed(), false);
+  assert.equal(log.toggleCollapsed(true), true);
+  assert.equal(log.toggleCollapsed(true), true);
 });
 
 test('無効なときは 1 行も記録しない', () => {
