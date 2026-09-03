@@ -1,6 +1,32 @@
 /* 効果音サンプラーのスタイル。外部フォント・外部CSSには依存しない */
 
+/* テーマに依存しないトークン */
 :root {
+  --radius: 16px;
+}
+
+/*
+ * 配色はここに集約する。個々のセレクタには色を直書きせず var() で参照すること。
+ * data-theme は index.html の先頭で確定させるので、実際には light か dark が必ず付く。
+ * 属性が無い場合（JS 無効時など）はライトが当たる。
+ */
+:root,
+html[data-theme='light'] {
+  --bg: #f1f3f6;
+  --panel: #ffffff;
+  --panel-active: #e4e7ed;
+  --border: #ccd2dc;
+  --text: #171a20;
+  --muted: #56606f;
+  --accent: #1858c8;
+  --playing: #0d6e32;
+  --playing-surface: #dcf1e4;
+  --error: #c0271d;
+  /* フォームコントロールとスクロールバーをテーマに追随させる */
+  color-scheme: light;
+}
+
+html[data-theme='dark'] {
   --bg: #14161c;
   --panel: #1e2129;
   --panel-active: #272b35;
@@ -9,8 +35,8 @@
   --muted: #99a2b2;
   --accent: #4c8dff;
   --playing: #37c26d;
+  --playing-surface: #203831;
   --error: #ff7070;
-  --radius: 16px;
   color-scheme: dark;
 }
 
@@ -89,6 +115,7 @@ body {
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
+  white-space: nowrap;
 }
 
 .switch input {
@@ -98,7 +125,36 @@ body {
   cursor: pointer;
 }
 
+.field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field__label {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+}
+
+.field__select {
+  min-height: 44px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
 .stop-all {
+  white-space: nowrap;
   min-height: 44px;
   padding: 0 16px;
   border: 1px solid var(--border);
@@ -199,7 +255,7 @@ body {
 }
 
 .tile.is-playing .tile__pad {
-  background: rgba(55, 194, 109, 0.16);
+  background: var(--playing-surface);
 }
 
 .tile.is-playing .tile__state {
@@ -239,6 +295,28 @@ body {
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
+}
+
+/* 狭幅ではヘッダのコントロールが 1 行に収まらないので、縦に積んで折り返す */
+@media (max-width: 560px) {
+  .app__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app__controls {
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .field {
+    flex: 1 1 100%;
+  }
+
+  .field__select {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 @media (max-width: 380px) {

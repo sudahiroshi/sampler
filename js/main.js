@@ -2,12 +2,16 @@ import { AudioEngine } from './AudioEngine.js';
 import { SettingsStore } from './SettingsStore.js';
 import { SoundLibrary } from './SoundLibrary.js';
 import { SamplerUI } from './SamplerUI.js';
+import { ThemeController } from './ThemeController.js';
 
 // 各層を組み立てるだけの配線用モジュール。ロジックは各クラス側にある。
 const settings = new SettingsStore();
 const engine = new AudioEngine({
   keepAliveElement: document.getElementById('silent-keepalive'),
 });
+// data-theme 自体は index.html の同期スクリプトが先に付けている。
+// ここでは選択値の保持と、OS のテーマ変更への追従を受け持つ。
+const theme = new ThemeController({ settings }).init();
 const library = new SoundLibrary({
   engine,
   manifestUrl: 'sounds/manifest.json',
@@ -16,8 +20,10 @@ const library = new SoundLibrary({
 const ui = new SamplerUI({
   library,
   settings,
+  theme,
   gridElement: document.getElementById('grid'),
   statusElement: document.getElementById('status'),
+  themeSelect: document.getElementById('theme-select'),
   preloadToggle: document.getElementById('preload-toggle'),
   stopAllButton: document.getElementById('stop-all'),
 });

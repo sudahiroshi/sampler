@@ -91,6 +91,19 @@ export class SettingsStore {
     this.#write('preloadAll', enabled ? 'true' : 'false');
   }
 
+  /**
+   * テーマの選択値。保存されていなければ fallback を返す。
+   * 値が妥当かどうかは ThemeController が判断するので、ここでは素通しする。
+   */
+  getTheme(fallback = 'system') {
+    const raw = this.#read('theme');
+    return raw === null ? fallback : raw;
+  }
+
+  setTheme(mode) {
+    this.#write('theme', String(mode));
+  }
+
   #read(key) {
     try {
       return this.#storage.getItem(this.#prefix + key);

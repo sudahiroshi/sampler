@@ -19,6 +19,8 @@ const STATE_LABELS = {
 export class SamplerUI {
   #library;
   #settings;
+  #theme;
+  #themeSelect;
   #grid;
   #status;
   #preloadToggle;
@@ -29,14 +31,27 @@ export class SamplerUI {
    * @param {object} options
    * @param {import('./SoundLibrary.js').SoundLibrary} options.library
    * @param {import('./SettingsStore.js').SettingsStore} options.settings
+   * @param {import('./ThemeController.js').ThemeController} options.theme
    * @param {HTMLElement} options.gridElement タイルを並べる親要素
    * @param {HTMLElement} options.statusElement 進捗やエラーを出す要素
+   * @param {HTMLSelectElement} options.themeSelect テーマ選択（3 択）
    * @param {HTMLInputElement} options.preloadToggle 「起動時に全読み込み」チェックボックス
    * @param {HTMLButtonElement} options.stopAllButton 全停止ボタン
    */
-  constructor({ library, settings, gridElement, statusElement, preloadToggle, stopAllButton }) {
+  constructor({
+    library,
+    settings,
+    theme,
+    gridElement,
+    statusElement,
+    themeSelect,
+    preloadToggle,
+    stopAllButton,
+  }) {
     this.#library = library;
     this.#settings = settings;
+    this.#theme = theme;
+    this.#themeSelect = themeSelect;
     this.#grid = gridElement;
     this.#status = statusElement;
     this.#preloadToggle = preloadToggle;
@@ -45,6 +60,11 @@ export class SamplerUI {
 
   /** ヘッダ側のコントロールを初期化して配線する */
   init() {
+    this.#themeSelect.value = this.#theme.mode;
+    this.#themeSelect.addEventListener('change', () => {
+      this.#theme.setMode(this.#themeSelect.value);
+    });
+
     this.#preloadToggle.checked = this.#settings.getPreloadAll();
     this.#preloadToggle.addEventListener('change', () => {
       const enabled = this.#preloadToggle.checked;

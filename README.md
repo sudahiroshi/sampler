@@ -7,6 +7,7 @@ HTML / Vanilla JS / CSS だけで書かれており、フレームワークも�
 - 音源は Web Audio API で再生し、一度読み込んだ AudioBuffer はメモリに保持します（2 回目以降は再取得しません）
 - 音量は音源ごとに調整でき、`localStorage` に保存されて次回起動時に復元されます
 - 「起動時に全部読み込む」を有効にすると、起動直後にすべての音源を先読みします
+- テーマは「システム設定に従う（既定）/ ライト / ダーク」の 3 択で、選択は保存されます
 - iPhone / iPad の Safari を想定した対応を入れています（後述）
 
 ## 起動方法
@@ -35,6 +36,8 @@ npx http-server -p 8123
 - 各タイルのスライダーで音量を 0〜100% に調整できます。変更は即座に保存されます
 - 「起動時に全部読み込む」をオンにすると、次回以降の起動時にすべての音源を先読みします
   （オンにした時点でもその場で読み込みます）。オフのときは初回タップ時に読み込みます
+- 「テーマ」で配色を切り替えられます。「システム設定に従う」のときは OS のダーク／ライト設定に
+  追従し、OS 側を切り替えると再読み込みなしで即座に反映されます
 
 ## 音源の追加手順
 
@@ -76,6 +79,7 @@ iOS 対策用の `silence.wav` が再生成されます。乱数は固定シー�
 
 ```sh
 node tests/verify-wav.mjs   # ヘッダ・長さ・振幅（無音でない/クリッピングしていない）を実測
+node tests/contrast.mjs     # 両テーマのコントラスト比を WCAG の式で実測
 node --test 'tests/*.test.mjs'
 ```
 
@@ -89,11 +93,33 @@ node --test 'tests/*.test.mjs'
 | `js/Sound.js` | 音源 1 つの読み込みと再生。AudioBuffer を保持し、GainNode で音量を掛ける。DOM に触れない |
 | `js/SoundLibrary.js` | `manifest.json` から `Sound` の集合を組み立て、プリロードと全停止をまとめる |
 | `js/SettingsStore.js` | `localStorage` への永続化。使えない環境ではメモリへ自動フォールバックする |
+| `js/ThemeController.js` | 選択値と OS 設定から適用テーマを決め、`data-theme` を付ける。保存は `SettingsStore` に委譲 |
 | `js/SamplerUI.js` | タイルの描画とイベント処理。再生ロジックは持たない |
 | `js/main.js` | 上記を組み立てる配線だけ |
 
 依存の向きは `main → UI → SoundLibrary → Sound → AudioEngine` の一方向で、
 `Sound` / `SoundLibrary` / `SettingsStore` は DOM に依存しないため Node.js 上でテストできます。
+
+## テーマ（配色）の仕組み
+
+配色は CSS カスタムプロパティに集約してあり、個々のセレクタに色を直書きしていません。
+
+```css
+:root, html[data-theme='light'] { --bg: …; color-scheme: light; }
+html[data-theme='dark']         { --bg: …; color-scheme: dark; }
+```
+
+- 適用テーマは `<html data-theme="light|dark">` で決まります。「システム設定に従う」を選んでいる場合は
+  `prefers-color-scheme` の結果を `ThemeController` が解決して属性へ書き込みます
+- `color-scheme` を指定しているので、音量スライダーやセレクトなどのフォームコントロールと
+  スクロールバーもテーマに追随します
+- 初期表示のちらつき（白フラッシュ）を避けるため、`index.html` の `<head>` 内・**スタイルシートを読む前**の
+  同期スクリプトで `data-theme` を確定させています。`<script type="module">` は defer 扱いになり
+  最初の描画に間に合わないため、ここだけモジュールではなく素の `<script>` です
+- 色を変えるときは `css/style.css` のトークンだけを編集し、`node tests/contrast.mjs` で
+  コントラスト比（本文とタイルのラベルは 4.5:1 以上）を確認してください
+- `data-theme` が付かない場合（JavaScript を無効にした場合など）はライトが当たります。
+  その状態ではアプリ自体が動かないため、フォールバックの見た目のみの意味です
 
 ## iOS / iPadOS での注意点
 

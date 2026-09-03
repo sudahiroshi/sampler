@@ -4,9 +4,27 @@
     <meta charset="UTF-8" />
     <!-- viewport-fit=cover でノッチ端末のセーフエリアを扱えるようにする -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="description" content="ブラウザで効果音を鳴らすサンプラー" />
     <title>効果音サンプラー</title>
+    <script>
+      // FOUC 対策: スタイルシートを読む前に data-theme を確定させ、最初の描画から正しい配色にする。
+      // type="module" にすると defer 扱いになって最初の描画に間に合わないため、同期スクリプトで書く。
+      // 保存キーは SettingsStore と同じ 'sampler:theme'（値の管理は js/ThemeController.js が正）。
+      (function () {
+        var mode = 'system';
+        try {
+          mode = localStorage.getItem('sampler:theme') || 'system';
+        } catch (e) {
+          // localStorage が使えない環境ではシステム設定に従う
+        }
+        var prefersDark =
+          typeof window.matchMedia === 'function' &&
+          window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var dark = mode === 'dark' || (mode !== 'light' && prefersDark);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      })();
+    </script>
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
@@ -14,6 +32,14 @@
       <header class="app__header">
         <h1 class="app__title">効果音サンプラー</h1>
         <div class="app__controls">
+          <div class="field">
+            <label class="field__label" for="theme-select">テーマ</label>
+            <select id="theme-select" class="field__select">
+              <option value="system">システム設定に従う</option>
+              <option value="light">ライト</option>
+              <option value="dark">ダーク</option>
+            </select>
+          </div>
           <div class="switch">
             <input type="checkbox" id="preload-toggle" />
             <label class="switch__label" for="preload-toggle">起動時に全部読み込む</label>
