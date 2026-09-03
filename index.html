@@ -23,6 +23,27 @@
           window.matchMedia('(prefers-color-scheme: dark)').matches;
         var dark = mode === 'dark' || (mode !== 'light' && prefersDark);
         document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+
+        // モジュールの読み込み前に起きたエラーも診断ログへ回せるよう、ここで拾っておく。
+        // js/main.js が起動時にこの配列を読み出す。
+        window.__samplerEarlyErrors = [];
+        var push = function (text) {
+          if (window.__samplerEarlyErrors.length < 50) window.__samplerEarlyErrors.push(text);
+        };
+        window.addEventListener('error', function (event) {
+          push(
+            'error: ' +
+              (event.message || event.type) +
+              ' @ ' +
+              (event.filename || '?') +
+              ':' +
+              (event.lineno || 0),
+          );
+        });
+        window.addEventListener('unhandledrejection', function (event) {
+          var reason = event.reason;
+          push('unhandledrejection: ' + ((reason && reason.message) || reason));
+        });
       })();
     </script>
     <link rel="stylesheet" href="css/style.css" />

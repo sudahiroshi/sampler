@@ -11,6 +11,15 @@ const settings = new SettingsStore();
 const log = new DebugLog({ enabled: DebugLog.isEnabled() }).mount(
   document.querySelector('.app') ?? document.body,
 );
+
+// index.html の先頭で拾っておいたエラーを取り込み、以降も記録し続ける
+for (const text of globalThis.__samplerEarlyErrors ?? []) log.log('error', text);
+addEventListener('error', (event) => {
+  log.log('error', `${event.message || event.type} @ ${event.filename ?? '?'}:${event.lineno ?? 0}`);
+});
+addEventListener('unhandledrejection', (event) => {
+  log.log('error', `unhandledrejection: ${event.reason?.message ?? event.reason}`);
+});
 // AudioContext はこの 1 インスタンスだけを使い回す
 const engine = new AudioEngine({ log });
 // data-theme 自体は index.html の同期スクリプトが先に付けている。
@@ -42,6 +51,10 @@ const unlock = () => {
 for (const type of ['pointerdown', 'touchend', 'keydown']) {
   document.addEventListener(type, unlock, { once: true, passive: true });
 }
+
+log.setHeadline(
+  `再生経路: Web Audio (AudioContext) / Web Audio 対応: ${AudioEngine.isSupported ? 'あり' : 'なし'}`,
+);
 
 async function start() {
   if (!AudioEngine.isSupported) {

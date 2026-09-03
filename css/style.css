@@ -307,22 +307,80 @@ body {
   background: var(--panel);
 }
 
+.debug-log__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
 .debug-log__title {
-  margin: 0 0 6px;
-  font-size: 0.75rem;
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.debug-log__copy {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-active);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.debug-log__status {
+  font-size: 0.78rem;
   color: var(--muted);
+}
+
+.debug-log__headline {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .debug-log__list {
   margin: 0;
   padding: 0;
-  max-height: 40vh;
+  max-height: 45vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   list-style: none;
-  font-size: 0.7rem;
-  line-height: 1.5;
+  font-size: 0.8rem;
+  line-height: 1.55;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--text);
+  /* 長い URL やメッセージでも折り返して読めるようにする */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.debug-log__item {
+  padding: 1px 0;
+}
+
+.debug-log__item--warn {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.debug-log__fallback {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .debug-log__item--error {

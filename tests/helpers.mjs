@@ -6,6 +6,7 @@ export function createMockEngine() {
     decodeCount: 0,
     unlockCount: 0,
     currentTime: 0,
+    createdSources: [],
     destination: { name: 'destination' },
     async unlock() {
       engine.unlockCount += 1;
@@ -42,10 +43,95 @@ export function createMockEngine() {
           source.stopCount += 1;
         },
       };
+      engine.createdSources.push(source);
       return source;
     },
   };
   return engine;
+}
+
+/** 診断ログの代わり。記録された行を後から検査できる */
+export function createLogSpy() {
+  const entries = [];
+  return {
+    enabled: true,
+    entries,
+    log(category, message) {
+      entries.push({ category, message });
+    },
+    warn(message) {
+      entries.push({ category: 'warn', message });
+    },
+    warnings() {
+      return entries.filter((entry) => entry.category === 'warn').map((entry) => entry.message);
+    },
+    messages(category) {
+      return entries.filter((entry) => entry.category === category).map((entry) => entry.message);
+    },
+  };
+}
+
+/**
+ * テスト用の WAV を作る。truncateTo を渡すとその長さで切り落とす（途中で切れた応答を模す）。
+ */
+export function buildTestWav({
+  sampleRate = 44100,
+  seconds = 1,
+  channels = 1,
+  bits = 16,
+  truncateTo = null,
+} = {}) {
+  const frames = Math.round(sampleRate * seconds);
+  const bytesPerFrame = channels * (bits / 8);
+  const dataBytes = frames * bytesPerFrame;
+  const total = 44 + dataBytes;
+  const buffer = new ArrayBuffer(total);
+  const view = new DataView(buffer);
+  const writeAscii = (offset, text) => {
+    for (let i = 0; i < text.length; i++) view.setUint8(offset + i, text.charCodeAt(i));
+  };
+
+  writeAscii(0, 'RIFF');
+  view.setUint32(4, total - 8, true);
+  writeAscii(8, 'WAVE');
+  writeAscii(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, channels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * bytesPerFrame, true);
+  view.setUint16(32, bytesPerFrame, true);
+  view.setUint16(34, bits, true);
+  writeAscii(36, 'data');
+  view.setUint32(40, dataBytes, true);
+  for (let i = 0; i < frames; i++) {
+    view.setInt16(44 + i * bytesPerFrame, ((i % 200) - 100) * 100, true);
+  }
+
+  return truncateTo === null ? buffer : buffer.slice(0, truncateTo);
+}
+
+/** Content-Length を明示できる fetch の代わり */
+export function createHeaderFetch({ status = 200, contentLength, body }) {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: {
+        get: (name) =>
+          name.toLowerCase() === 'content-length' && contentLength !== undefined
+            ? String(contentLength)
+            : null,
+      },
+      async arrayBuffer() {
+        return body;
+      },
+    };
+  };
+  fetchImpl.calls = calls;
+  return fetchImpl;
 }
 
 /**
