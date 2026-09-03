@@ -7,6 +7,13 @@ import { SoundState } from './Sound.js';
  * そのため UI をまるごと差し替えても音の再生部分はそのまま再利用できる。
  */
 
+/**
+ * 同じタイルの重複発火を無視する時間（ms）。
+ * iOS の 1 タップは touchstart / touchend / click が続けて発火するため、
+ * 何かの拍子に 2 回ハンドラが走っても「再生した直後に自分で止める」事故を防ぐ。
+ */
+const DUPLICATE_WINDOW_MS = 250;
+
 /** 状態ごとにタイルへ出す文言 */
 const STATE_LABELS = {
   [SoundState.IDLE]: 'タップで再生',
@@ -26,6 +33,9 @@ export class SamplerUI {
   #preloadToggle;
   #stopAllButton;
   #tiles = new Map();
+  #lastActivatedAt = new Map();
+  #now;
+  #log;
 
   /**
    * @param {object} options
@@ -37,6 +47,8 @@ export class SamplerUI {
    * @param {HTMLSelectElement} options.themeSelect テーマ選択（3 択）
    * @param {HTMLInputElement} options.preloadToggle 「起動時に全読み込み」チェックボックス
    * @param {HTMLButtonElement} options.stopAllButton 全停止ボタン
+   * @param {import('./DebugLog.js').DebugLog} [options.log] 診断ログ
+   * @param {() => number} [options.now] 重複判定に使う時刻。テストから差し替える
    */
   constructor({
     library,
@@ -47,6 +59,8 @@ export class SamplerUI {
     themeSelect,
     preloadToggle,
     stopAllButton,
+    log = null,
+    now = () => Date.now(),
   }) {
     this.#library = library;
     this.#settings = settings;
@@ -56,6 +70,8 @@ export class SamplerUI {
     this.#status = statusElement;
     this.#preloadToggle = preloadToggle;
     this.#stopAllButton = stopAllButton;
+    this.#log = log;
+    this.#now = now;
   }
 
   /** ヘッダ側のコントロールを初期化して配線する */
@@ -78,6 +94,8 @@ export class SamplerUI {
     });
 
     this.#stopAllButton.addEventListener('click', () => {
+      this.#log?.log('event', '全停止');
+      // 止めるのは再生中のノードだけ。AudioContext は動かしたままにする
       this.#library.stopAll();
       this.setStatus('すべての音を停止しました。');
     });
@@ -147,7 +165,17 @@ export class SamplerUI {
     state.className = 'tile__state';
 
     pad.append(icon, name, state);
-    pad.addEventListener('click', () => this.#handlePadClick(sound));
+    // iOS でも 1 タップ = 1 回の発火にするため click だけを購読する。
+    // 万一 2 回来ても #activate 側の重複判定で弾く。
+    pad.addEventListener('click', () => this.#activate(sound, 'click'));
+    if (this.#log?.enabled) {
+      // 実機で何が発火しているかを見るための購読。動作には影響させない
+      for (const type of ['pointerdown', 'touchstart', 'touchend']) {
+        pad.addEventListener(type, () => this.#log.log('event', `${sound.id} ${type}`), {
+          passive: true,
+        });
+      }
+    }
 
     const volumeRow = document.createElement('div');
     volumeRow.className = 'tile__volume';
@@ -177,7 +205,23 @@ export class SamplerUI {
     return { root, pad, state, slider, value };
   }
 
-  async #handlePadClick(sound) {
+  /**
+   * タイルが操作されたときの入口。
+   * 直近の操作から DUPLICATE_WINDOW_MS 以内の再発火は重複として無視する。
+   */
+  #activate(sound, eventType) {
+    const at = this.#now();
+    const last = this.#lastActivatedAt.get(sound.id);
+    if (last !== undefined && at - last < DUPLICATE_WINDOW_MS) {
+      this.#log?.log('event', `${sound.id} ${eventType} を重複として無視 (${at - last}ms)`);
+      return;
+    }
+    this.#lastActivatedAt.set(sound.id, at);
+    this.#log?.log('event', `${sound.id} ${eventType} → ${sound.isPlaying ? '停止' : '再生'}`);
+    this.#toggle(sound);
+  }
+
+  async #toggle(sound) {
     if (sound.isPlaying) {
       sound.stop();
       return;
@@ -186,6 +230,7 @@ export class SamplerUI {
       await sound.play();
     } catch (error) {
       this.setStatus(`${sound.name}: ${error.message}`);
+      this.#log?.log('error', `${sound.id} ${error.message}`);
     }
   }
 

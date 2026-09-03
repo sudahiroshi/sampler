@@ -37,7 +37,11 @@ export class Sound {
 
   #volume;
   #active = null;
+  // 再生中・停止処理中のノード。iOS Safari は参照が切れた再生中ノードを
+  // 回収して音を途切れさせることがあるため、明示的に保持し onended で解放する。
+  #playing = new Set();
   #listeners = new Set();
+  #log;
 
   /**
    * @param {{id: string, name: string, icon?: string, file: string, defaultVolume?: number}} definition
@@ -47,8 +51,9 @@ export class Sound {
    * @param {string} [options.baseUrl] file を解決する基準（例: "sounds/"）
    * @param {number} [options.volume] 初期音量。省略時は defaultVolume
    * @param {typeof fetch} [options.fetchImpl] テストから差し替えるための fetch
+   * @param {import('./DebugLog.js').DebugLog} [options.log] 診断ログ
    */
-  constructor(definition, { engine, baseUrl = '', volume, fetchImpl } = {}) {
+  constructor(definition, { engine, baseUrl = '', volume, fetchImpl, log = null } = {}) {
     if (!definition?.id || !definition?.file) {
       throw new Error('音源定義には id と file が必要です');
     }
@@ -58,6 +63,7 @@ export class Sound {
     const base = baseUrl.replace(/\/+$/, '');
     this.#url = base ? `${base}/${definition.file}` : definition.file;
     this.#volume = clampVolume(volume ?? definition.defaultVolume ?? 1);
+    this.#log = log;
   }
 
   get id() {
@@ -94,6 +100,11 @@ export class Sound {
 
   get volume() {
     return this.#volume;
+  }
+
+  /** 参照を保持しているノード数。再生が終われば 0 に戻る（リーク検出用） */
+  get heldNodeCount() {
+    return this.#playing.size;
   }
 
   /** 音量を変更する。再生中なら即座に反映される */
@@ -163,35 +174,31 @@ export class Sound {
     source.connect(gain);
     gain.connect(this.#engine.destination);
 
-    const active = { source, gain };
-    source.onended = () => {
-      try {
-        source.disconnect();
-        gain.disconnect();
-      } catch {
-        // 既に切断済みでも問題ない
-      }
-      // stop() で差し替わっている場合は状態を触らない
-      if (this.#active === active) {
-        this.#active = null;
-        this.#setState(SoundState.READY);
-      }
-    };
+    const node = { source, gain, releaseTimer: null };
+    this.#playing.add(node);
+    source.onended = () => this.#release(node);
 
-    this.#active = active;
+    this.#active = node;
     source.start();
+    this.#log?.log(
+      'play',
+      `${this.id} 再生開始 (state=${this.#engine.state}, 保持ノード=${this.#playing.size})`,
+    );
     this.#setState(SoundState.PLAYING);
   }
 
-  /** 再生中なら止める。鳴っていなければ何もしない */
+  /**
+   * 再生中なら止める。鳴っていなければ何もしない。
+   * 止めるのは再生中のソースノードだけで、AudioContext の状態には触らない。
+   */
   stop() {
-    const active = this.#active;
-    if (!active) return;
+    const node = this.#active;
+    if (!node) return;
     this.#active = null;
 
     const now = this.#engine.currentTime;
     try {
-      const gainParam = active.gain.gain;
+      const gainParam = node.gain.gain;
       gainParam.cancelScheduledValues(now);
       gainParam.setValueAtTime(gainParam.value, now);
       gainParam.linearRampToValueAtTime(0, now + STOP_FADE_SEC);
@@ -199,13 +206,40 @@ export class Sound {
       // ランプを組めなくても停止自体は行う
     }
     try {
-      active.source.stop(now + STOP_FADE_SEC);
+      node.source.stop(now + STOP_FADE_SEC);
     } catch {
       // 既に停止済みの場合は例外になるが無視してよい
     }
 
+    // フェードが終わるまでは参照を保持し続ける。onended が来ない環境でも
+    // 参照が残り続けないよう、保険として解放を予約しておく。
+    node.releaseTimer = setTimeout(() => this.#release(node), STOP_FADE_SEC * 1000 + 250);
+
+    this.#log?.log('play', `${this.id} 停止`);
     if (this.#state === SoundState.PLAYING) {
       this.#setState(this.isLoaded ? SoundState.READY : SoundState.IDLE);
+    }
+  }
+
+  /** ノードを切断して保持を解除する。二重に呼ばれても安全 */
+  #release(node) {
+    if (!this.#playing.delete(node)) return;
+    if (node.releaseTimer !== null) {
+      clearTimeout(node.releaseTimer);
+      node.releaseTimer = null;
+    }
+    try {
+      node.source.onended = null;
+      node.source.disconnect();
+      node.gain.disconnect();
+    } catch {
+      // 既に切断済みでも問題ない
+    }
+    // stop() で差し替わっている場合は状態を触らない
+    if (this.#active === node) {
+      this.#active = null;
+      this.#log?.log('play', `${this.id} 再生終了`);
+      this.#setState(SoundState.READY);
     }
   }
 

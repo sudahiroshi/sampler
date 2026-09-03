@@ -11,6 +11,7 @@ export class SoundLibrary {
   #settings;
   #manifestUrl;
   #fetch;
+  #log;
   #sounds = new Map();
 
   /**
@@ -20,12 +21,20 @@ export class SoundLibrary {
    * @param {import('./SettingsStore.js').SettingsStore|null} [options.settings]
    *   音量の保存先。null なら manifest の defaultVolume をそのまま使う
    * @param {typeof fetch} [options.fetchImpl]
+   * @param {import('./DebugLog.js').DebugLog} [options.log] 診断ログ
    */
-  constructor({ engine, manifestUrl = 'sounds/manifest.json', settings = null, fetchImpl } = {}) {
+  constructor({
+    engine,
+    manifestUrl = 'sounds/manifest.json',
+    settings = null,
+    fetchImpl,
+    log = null,
+  } = {}) {
     this.#engine = engine;
     this.#settings = settings;
     this.#manifestUrl = manifestUrl;
     this.#fetch = fetchImpl ?? ((...args) => globalThis.fetch(...args));
+    this.#log = log;
   }
 
   /** manifest を取得して Sound を組み立てる */
@@ -62,6 +71,7 @@ export class SoundLibrary {
           baseUrl,
           volume,
           fetchImpl: this.#fetch,
+          log: this.#log,
         }),
       );
     }

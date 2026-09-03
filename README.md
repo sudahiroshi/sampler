@@ -72,8 +72,8 @@ npx http-server -p 8123
 node tools/generate-sounds.mjs
 ```
 
-`sounds/` 配下の `fanfare.wav` / `drumroll.wav` / `correct.wav` / `wrong.wav` と、
-iOS 対策用の `silence.wav` が再生成されます。乱数は固定シードなので、実行するたびに同じ結果になります。
+`sounds/` 配下の `fanfare.wav` / `drumroll.wav` / `correct.wav` / `wrong.wav` が再生成されます。
+乱数は固定シードなので、実行するたびに同じ結果になります。
 
 生成物の検証:
 
@@ -94,6 +94,7 @@ node --test 'tests/*.test.mjs'
 | `js/SoundLibrary.js` | `manifest.json` から `Sound` の集合を組み立て、プリロードと全停止をまとめる |
 | `js/SettingsStore.js` | `localStorage` への永続化。使えない環境ではメモリへ自動フォールバックする |
 | `js/ThemeController.js` | 選択値と OS 設定から適用テーマを決め、`data-theme` を付ける。保存は `SettingsStore` に委譲 |
+| `js/DebugLog.js` | `?debug=1` のときだけ画面に診断ログを出す。通常表示では何も描画しない |
 | `js/SamplerUI.js` | タイルの描画とイベント処理。再生ロジックは持たない |
 | `js/main.js` | 上記を組み立てる配線だけ |
 
@@ -125,15 +126,37 @@ html[data-theme='dark']         { --bg: …; color-scheme: dark; }
 
 - **最初のタップまで音は鳴りません。** iOS は最初のユーザー操作がないと `AudioContext` を起動しないため、
   タイルを 1 回タップした時点で unlock 処理（無音バッファの再生と `resume()`）が走ります
-- **消音（サイレント）モードでは音が出ないことがあります。** Web Audio は消音スイッチの影響を受けるため、
-  `sounds/silence.wav` を再生してオーディオセッションを起こす対策を入れていますが、
-  iOS のバージョンによっては効きません。本番前に消音モードを解除し、本体音量を上げて確認してください
-- ホーム画面に追加した場合や他アプリから戻った場合、`AudioContext` が中断されることがあります。
-  再生のたびに `resume()` を試みるため、通常はタップし直せば復帰します
+- **消音（サイレント）モードでは音が出ません。** Web Audio は消音スイッチの影響を受けます。
+  本番前に消音モードを解除し、本体音量を上げて確認してください。
+  以前は無音の `<audio>` を鳴らしてオーディオセッションを起こす対策を入れていましたが、
+  その要素が鳴り終わった時点でセッションが解放され、**再生中の音まで中断される**不具合があったため取り外しました
+- ホーム機能から戻った場合や他アプリの音・着信のあとは、`AudioContext` が `suspended` または
+  iOS 独自の `interrupted` に落ちます。再生のたびに「`running` 以外なら `resume()`」を試みるため、
+  タップし直せば復帰します。`AudioContext` はアプリ全体で 1 個だけ生成し、`close()` は呼びません
 - ダブルタップズームとタップ遅延は `touch-action: manipulation` で抑止しています
 - 高さは `100dvh` を使っているため、アドレスバーの伸縮でレイアウトが崩れません
 - **本番前に一度リハーサルしてください。** 起動時プリロードをオンにしておくと、
   本番中の初回タップで読み込み待ちが発生しません
+
+## 不具合が出たときの診断（`?debug=1`）
+
+iOS Safari は手元でコンソールが見られないため、URL に `?debug=1` を付けると画面下に診断ログが出ます。
+
+```
+http://<サーバの IP>:8123/?debug=1
+```
+
+記録されるのは次の 4 種です。通常の URL では何も表示されず、ログも記録しません。
+
+| 種別 | 内容 |
+| --- | --- |
+| `context` | `AudioContext` の生成（何個目か）と state の遷移（`suspended` / `running` / `interrupted`）、`resume()` の試行結果 |
+| `event` | タイルで発火したイベント（`pointerdown` / `touchstart` / `touchend` / `click`）と、重複として無視した操作 |
+| `play` | 再生開始（そのときの state と保持ノード数）、停止、再生終了 |
+| `error` | `unlock` / `resume` / 音源読み込みの失敗 |
+
+「音が途中で切れる」ときは `context` 行で state が `interrupted` や `suspended` に落ちていないか、
+「タップしたのに鳴らない」ときは `event` 行が 1 タップで 2 回出ていないかを見てください。
 
 ## ディレクトリ構成
 

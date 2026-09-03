@@ -297,6 +297,42 @@ body {
   color: var(--muted);
 }
 
+/* --- 診断ログ（?debug=1 のときだけ挿入される） --- */
+
+.debug-log {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.debug-log__title {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.debug-log__list {
+  margin: 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  list-style: none;
+  font-size: 0.7rem;
+  line-height: 1.5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text);
+}
+
+.debug-log__item--error {
+  color: var(--error);
+}
+
+.debug-log__item--context {
+  color: var(--accent);
+}
+
 /* 狭幅ではヘッダのコントロールが 1 行に収まらないので、縦に積んで折り返す */
 @media (max-width: 560px) {
   .app__header {

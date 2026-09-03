@@ -94,3 +94,159 @@ export function createFakeStorage() {
     removeItem: (key) => map.delete(key),
   };
 }
+
+/**
+ * AudioContext の代わり。生成数・resume / suspend / close の呼び出しを数えられる。
+ * iOS の 'interrupted' も再現できるよう state を外から書き換えられるようにしている。
+ */
+export function createFakeAudioContextClass({ initialState = 'suspended' } = {}) {
+  const instances = [];
+
+  class FakeAudioContext {
+    constructor() {
+      this.state = initialState;
+      this.sampleRate = 44100;
+      this.currentTime = 0;
+      this.destination = { name: 'destination' };
+      this.resumeCalls = 0;
+      this.suspendCalls = 0;
+      this.closeCalls = 0;
+      this.createdSources = [];
+      this.listeners = [];
+      instances.push(this);
+    }
+
+    addEventListener(type, listener) {
+      this.listeners.push([type, listener]);
+    }
+
+    emitStateChange() {
+      for (const [type, listener] of this.listeners) {
+        if (type === 'statechange') listener({ type });
+      }
+    }
+
+    createBuffer(channels, length) {
+      return { numberOfChannels: channels, length };
+    }
+
+    createBufferSource() {
+      const source = {
+        buffer: null,
+        onended: null,
+        startCount: 0,
+        stopCount: 0,
+        disconnectCount: 0,
+        connect() {},
+        disconnect() {
+          source.disconnectCount += 1;
+        },
+        start() {
+          source.startCount += 1;
+        },
+        stop() {
+          source.stopCount += 1;
+        },
+      };
+      this.createdSources.push(source);
+      return source;
+    }
+
+    createGain() {
+      return {
+        gain: {
+          value: 1,
+          cancelScheduledValues() {},
+          setValueAtTime() {},
+          linearRampToValueAtTime() {},
+        },
+        connect() {},
+        disconnect() {},
+      };
+    }
+
+    async resume() {
+      this.resumeCalls += 1;
+      this.state = 'running';
+      this.emitStateChange();
+    }
+
+    async suspend() {
+      this.suspendCalls += 1;
+      this.state = 'suspended';
+      this.emitStateChange();
+    }
+
+    async close() {
+      this.closeCalls += 1;
+      this.state = 'closed';
+      this.emitStateChange();
+    }
+
+    decodeAudioData(arrayBuffer, onSuccess) {
+      onSuccess({ byteLength: arrayBuffer.byteLength, duration: 1 });
+    }
+  }
+
+  return { FakeAudioContext, instances };
+}
+
+/**
+ * SamplerUI を Node 上で動かすための最小の document。
+ * 生成した要素は fire(type) で登録済みリスナーを直接呼べる。
+ */
+export function createFakeDocument() {
+  const createElement = (tag) => {
+    const element = {
+      tagName: tag.toUpperCase(),
+      children: [],
+      dataset: {},
+      attributes: {},
+      listeners: new Map(),
+      textContent: '',
+      className: '',
+      value: '',
+      checked: false,
+      classList: {
+        names: new Set(),
+        add(name) {
+          this.names.add(name);
+        },
+        remove(name) {
+          this.names.delete(name);
+        },
+        toggle(name, on) {
+          if (on) this.names.add(name);
+          else this.names.delete(name);
+        },
+        contains(name) {
+          return this.names.has(name);
+        },
+      },
+      append(...nodes) {
+        element.children.push(...nodes);
+      },
+      setAttribute(name, value) {
+        element.attributes[name] = String(value);
+      },
+      getAttribute(name) {
+        return element.attributes[name] ?? null;
+      },
+      addEventListener(type, listener) {
+        if (!element.listeners.has(type)) element.listeners.set(type, []);
+        element.listeners.get(type).push(listener);
+      },
+      /** 登録済みリスナーを呼ぶ（イベント発火の代わり） */
+      fire(type) {
+        for (const listener of element.listeners.get(type) ?? []) listener({ type });
+      },
+    };
+    return element;
+  };
+  return { createElement };
+}
+
+/** マイクロタスクとタイマーを消化する */
+export function settle(ms = 0) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

@@ -286,10 +286,3 @@ for (const sound of SOUNDS) {
   writeFileSync(join(outputDir, sound.file), wav);
   report(sound.file, sound.label, track, wav);
 }
-
-// iOS のオーディオセッションを起こすために index.html から再生する無音ファイル。
-// UI には出さないので manifest には載せない。
-const silence = new AudioTrack(0.4);
-const silenceWav = silence.toWav();
-writeFileSync(join(outputDir, 'silence.wav'), silenceWav);
-report('silence.wav', '無音(iOS用)', silence, silenceWav);
