@@ -1,0 +1,32 @@
+{
+  "sounds": [
+    {
+      "id": "fanfare",
+      "name": "ファンファーレ",
+      "icon": "🎺",
+      "file": "fanfare.wav",
+      "defaultVolume": 0.8
+    },
+    {
+      "id": "drumroll",
+      "name": "ドラムロール",
+      "icon": "🥁",
+      "file": "drumroll.wav",
+      "defaultVolume": 0.7
+    },
+    {
+      "id": "correct",
+      "name": "正解",
+      "icon": "⭕",
+      "file": "correct.wav",
+      "defaultVolume": 0.85
+    },
+    {
+      "id": "wrong",
+      "name": "不正解",
+      "icon": "❌",
+      "file": "wrong.wav",
+      "defaultVolume": 0.85
+    }
+  ]
+}
